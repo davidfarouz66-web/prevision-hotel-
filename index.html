@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f1e8" />
+    <title>Prévisionnel Séjours & Réceptions</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="phone-shell" aria-label="Prototype CRM mobile">
+      <section class="screen home-screen is-active" id="homeScreen">
+        <header class="topbar">
+          <div>
+            <h1>Odem Event</h1>
+          </div>
+          <button class="text-button" id="newProjectBtn">Nouveau</button>
+        </header>
+
+        <div class="section-title home-title">
+          <h2>Séjours actifs</h2>
+        </div>
+        <section class="project-list" id="projectList"></section>
+
+        <div class="section-title home-title">
+          <h2>Séjours terminés</h2>
+        </div>
+        <section class="project-list completed-list" id="completedProjectList"></section>
+      </section>
+
+      <section class="screen detail-screen" id="detailScreen">
+        <header class="detail-header">
+          <button class="icon-button ghost" id="backBtn" aria-label="Retour">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div>
+            <p class="eyebrow" id="projectType">Séjour</p>
+            <h1 id="projectName">Projet</h1>
+          </div>
+          <button class="icon-button ghost" id="exportProjectBtn" aria-label="Exporter Excel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          </button>
+        </header>
+
+        <div class="result-card top-result-card" id="resultCard"></div>
+
+        <nav class="tabs" aria-label="Sections du projet">
+          <button class="tab is-selected" data-tab="resume">Vue simple</button>
+          <button class="tab" data-tab="budget">Dépenses</button>
+          <button class="tab" data-tab="notes">Notes</button>
+        </nav>
+
+        <section class="tab-panel is-active" id="resumePanel">
+          <div class="metrics" id="metrics"></div>
+          <div class="section-title tight">
+            <h2>Urgent</h2>
+            <button class="text-button" id="addForgottenBtn">+ Ajouter</button>
+          </div>
+          <div class="timeline" id="urgentPayments"></div>
+        </section>
+
+        <section class="tab-panel" id="budgetPanel">
+          <div class="section-title tight">
+            <h2>Dépenses prévues</h2>
+            <button class="text-button addLineBtn">Ajouter</button>
+          </div>
+          <div class="budget-list" id="fullBudget"></div>
+        </section>
+
+        <section class="tab-panel" id="notesPanel">
+          <div class="section-title tight">
+            <h2>Notes</h2>
+            <button class="text-button" id="addNoteBtn">Ajouter</button>
+          </div>
+          <div class="note-list" id="noteList"></div>
+        </section>
+      </section>
+
+      <button class="floating-add" id="floatingAdd" aria-label="Ajouter">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      </button>
+    </main>
+
+    <div class="sheet-backdrop" id="sheetBackdrop"></div>
+    <aside class="bottom-sheet" id="bottomSheet" aria-label="Ajout rapide">
+      <div class="grabber"></div>
+      <header>
+        <p class="eyebrow">Ajout rapide</p>
+        <h2 id="quickTitle">Ajouter une ligne</h2>
+      </header>
+      <form id="quickForm">
+        <label id="labelField">
+          Nom de la dépense ou de l'encaissement
+          <input name="label" placeholder="Ex : solde hôtel, serveurs, acompte client" required />
+        </label>
+        <div class="form-row">
+          <label id="amountLabel">
+            Prix prévu
+            <input name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="450" required />
+          </label>
+          <label id="paidLabel">
+            Déjà payé
+            <input name="paid" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" />
+          </label>
+        </div>
+        <section class="employee-pricing is-hidden" id="employeePricing">
+          <p>Calcul employé</p>
+          <div class="segmented">
+            <label>
+              <input type="radio" name="priceMode" value="global" checked />
+              <span>Prix global</span>
+            </label>
+            <label>
+              <input type="radio" name="priceMode" value="day" />
+              <span>Prix par jour</span>
+            </label>
+          </div>
+          <label id="employeeCountField">
+            Nombre de personnes
+            <input name="employeeCount" type="number" min="1" step="1" value="1" />
+          </label>
+          <label class="is-hidden" id="dayRateField">
+            Prix de la journée par personne
+            <input name="dayRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="280" />
+          </label>
+          <section class="range-picker is-hidden" id="rangePicker">
+            <input name="startDate" type="hidden" />
+            <input name="endDate" type="hidden" />
+            <header>
+              <button type="button" class="calendar-nav" id="prevMonth" aria-label="Mois précédent">‹</button>
+              <strong id="calendarMonth">Mois</strong>
+              <button type="button" class="calendar-nav" id="nextMonth" aria-label="Mois suivant">›</button>
+            </header>
+            <div class="range-hint" id="rangeHint">Clique sur la date de début, puis sur la date de fin.</div>
+            <div class="calendar-weekdays">
+              <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </section>
+          <div class="work-calendar is-hidden" id="workCalendar"></div>
+        </section>
+        <section class="payment-history is-hidden" id="paymentHistory"></section>
+        <div class="form-row">
+          <label id="kindField">
+            Type
+            <select name="kind">
+              <option value="expense">À payer</option>
+              <option value="income">À encaisser</option>
+            </select>
+          </label>
+          <label id="dueDateField" class="is-hidden">
+            Date prévue
+            <input name="dueDate" type="date" />
+          </label>
+        </div>
+        <label id="categoryField">
+          Catégorie
+          <select name="category" id="categorySelect"></select>
+        </label>
+        <div class="sheet-actions">
+          <button type="button" class="secondary-button" id="closeSheet">Annuler</button>
+          <button type="submit" class="primary-button" id="submitQuickForm">Ajouter</button>
+        </div>
+        <button type="button" class="delete-button is-hidden" id="deleteDetailBtn">Supprimer cette ligne</button>
+      </form>
+    </aside>
+
+    <aside class="bottom-sheet detail-sheet" id="projectSheet" aria-label="Nouveau projet">
+      <div class="grabber"></div>
+      <header class="sheet-header-row">
+        <div>
+          <p class="eyebrow">Nouveau</p>
+          <h2>Créer un projet</h2>
+        </div>
+        <button class="icon-button ghost" id="closeProjectSheet" aria-label="Fermer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <form id="projectForm">
+        <label>
+          Type
+          <select name="projectType">
+            <option value="Séjour">Séjour</option>
+            <option value="Réception">Réception / traiteur</option>
+          </select>
+        </label>
+        <label>
+          Nom
+          <input name="projectName" placeholder="Ex : Séjour Courchevel" required />
+        </label>
+        <div class="form-row">
+          <label>
+            Date
+            <input name="projectDate" type="date" required />
+          </label>
+          <label>
+            Participants
+            <input name="projectPeopleNew" type="number" min="0" step="1" inputmode="numeric" placeholder="88" />
+          </label>
+        </div>
+        <label>
+          Prix client prévu
+          <input name="projectSold" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" />
+        </label>
+        <div class="sheet-actions">
+          <button type="button" class="secondary-button" id="closeProjectSheetBottom">Annuler</button>
+          <button type="submit" class="primary-button">Créer</button>
+        </div>
+      </form>
+    </aside>
+
+    <aside class="bottom-sheet detail-sheet" id="detailSheet" aria-label="Détail de la ligne">
+      <div class="grabber"></div>
+      <header class="sheet-header-row">
+        <div>
+          <p class="eyebrow" id="lineCategory">Détail</p>
+          <h2 id="lineTitle">Ligne</h2>
+        </div>
+        <button class="icon-button ghost" id="closeDetailSheet" aria-label="Fermer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <section class="line-summary" id="lineSummary"></section>
+      <section class="line-details" id="lineDetails"></section>
+      <button class="wide-button" id="addDetailBtn">Ajouter un détail</button>
+      <button class="delete-button" id="deleteCategoryBtn">Supprimer cette catégorie</button>
+    </aside>
+
+    <aside class="bottom-sheet detail-sheet" id="clientSheet" aria-label="Encaissements client">
+      <div class="grabber"></div>
+      <header class="sheet-header-row">
+        <div>
+          <p class="eyebrow">Client</p>
+          <h2>Encaissements</h2>
+        </div>
+        <button class="icon-button ghost" id="closeClientSheet" aria-label="Fermer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <form id="clientForm">
+        <label>
+          Prix total à recevoir
+          <input name="clientTotal" type="number" min="0" step="0.01" inputmode="decimal" />
+        </label>
+        <label>
+          Participants / invités
+          <input name="projectPeople" type="number" min="0" step="1" inputmode="numeric" />
+        </label>
+        <section class="payment-history" id="clientPaymentHistory"></section>
+        <div class="form-row">
+          <label>
+            Nouvel encaissement
+            <input name="newClientPayment" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" />
+          </label>
+          <label>
+            Date
+            <input name="newClientPaymentDate" type="date" />
+          </label>
+        </div>
+        <div class="sheet-actions">
+          <button type="button" class="secondary-button" id="closeClientSheetBottom">Annuler</button>
+          <button type="submit" class="primary-button">Enregistrer</button>
+        </div>
+      </form>
+    </aside>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
