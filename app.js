@@ -153,6 +153,8 @@ const resultCard = document.querySelector("#resultCard");
 const fullBudget = document.querySelector("#fullBudget");
 const urgentPayments = document.querySelector("#urgentPayments");
 const noteList = document.querySelector("#noteList");
+const projectMenu = document.querySelector("#projectMenu");
+const projectMenuBtn = document.querySelector("#projectMenuBtn");
 const bottomSheet = document.querySelector("#bottomSheet");
 const detailSheet = document.querySelector("#detailSheet");
 const clientSheet = document.querySelector("#clientSheet");
@@ -644,6 +646,15 @@ function toggleNote(index) {
   scheduleCloudSave();
 }
 
+function addNote() {
+  const text = window.prompt("Nouvelle note");
+  if (!text?.trim()) return;
+  if (!Array.isArray(currentProject.notes)) currentProject.notes = [];
+  currentProject.notes.unshift({ text: text.trim(), done: false });
+  renderNotes();
+  scheduleCloudSave();
+}
+
 function exportCurrentProject() {
   const total = totals(currentProject);
   ensureClientPayments(currentProject);
@@ -808,6 +819,7 @@ function openLineDetail(index) {
 }
 
 function openDetail() {
+  closeProjectMenu();
   renderDetail();
   homeScreen.classList.remove("is-active");
   detailScreen.classList.add("is-active");
@@ -815,12 +827,21 @@ function openDetail() {
 }
 
 function openHome() {
+  closeProjectMenu();
   detailScreen.classList.remove("is-active");
   homeScreen.classList.add("is-active");
   renderHome();
 }
 
+function showTab(tabName) {
+  document.querySelectorAll(".tab").forEach((item) => item.classList.remove("is-selected"));
+  document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("is-active"));
+  document.querySelector(`[data-tab="${tabName}"]`)?.classList.add("is-selected");
+  document.querySelector(`#${tabName}Panel`)?.classList.add("is-active");
+}
+
 function openSheet(mode = "budget") {
+  closeProjectMenu();
   formMode = mode;
   currentDetailIndex = null;
   if (mode !== "edit-schedule") currentScheduleIndex = null;
@@ -863,6 +884,7 @@ function openSheet(mode = "budget") {
 }
 
 function openScheduleSheet(index = null) {
+  closeProjectMenu();
   currentScheduleIndex = index;
   openSheet(index === null ? "schedule" : "edit-schedule");
   const payment = index === null ? {
@@ -882,6 +904,7 @@ function openScheduleSheet(index = null) {
 }
 
 function openClientSheet() {
+  closeProjectMenu();
   const clientPayments = ensureClientPayments(currentProject);
   const received = currentProject.collected;
   const rest = Math.max(currentProject.sold - received, 0);
@@ -1071,6 +1094,7 @@ function closeSheet() {
 }
 
 function openProjectSheet() {
+  closeProjectMenu();
   projectFormMode = "create";
   document.querySelector("#projectForm").reset();
   document.querySelector("#projectSheetEyebrow").textContent = "Nouveau";
@@ -1083,6 +1107,7 @@ function openProjectSheet() {
 }
 
 function openEditProjectSheet() {
+  closeProjectMenu();
   projectFormMode = "edit";
   const form = document.querySelector("#projectForm");
   form.reset();
@@ -1128,9 +1153,47 @@ function applyProjectChanges(nextProject) {
   scheduleCloudSave();
 }
 
+function toggleProjectMenu() {
+  const isOpen = projectMenu.classList.toggle("is-open");
+  projectMenuBtn.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeProjectMenu() {
+  projectMenu.classList.remove("is-open");
+  projectMenuBtn.setAttribute("aria-expanded", "false");
+}
+
+function handleProjectMenuAction(action) {
+  closeProjectMenu();
+  if (action === "edit") {
+    openEditProjectSheet();
+  } else if (action === "client") {
+    openClientSheet();
+  } else if (action === "expense") {
+    showTab("budget");
+    openSheet("budget");
+  } else if (action === "schedule") {
+    openScheduleSheet(null);
+  } else if (action === "note") {
+    showTab("notes");
+    addNote();
+  } else if (action === "export") {
+    exportCurrentProject();
+  } else if (action === "new") {
+    openProjectSheet();
+  } else if (action === "home") {
+    openHome();
+  }
+}
+
 document.querySelector("#backBtn").addEventListener("click", openHome);
-document.querySelector("#exportProjectBtn").addEventListener("click", exportCurrentProject);
-document.querySelector("#editProjectBtn").addEventListener("click", openEditProjectSheet);
+projectMenuBtn.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleProjectMenu();
+});
+projectMenu.querySelectorAll("[data-menu-action]").forEach((button) => {
+  button.addEventListener("click", () => handleProjectMenuAction(button.dataset.menuAction));
+});
 document.querySelector("#floatingAdd").addEventListener("click", () => openSheet());
 document.querySelector("#addForgottenBtn").addEventListener("click", () => openSheet());
 document.querySelectorAll(".addLineBtn").forEach((button) => button.addEventListener("click", () => openSheet()));
@@ -1186,6 +1249,11 @@ document.querySelector("#deleteCategoryBtn").addEventListener("click", () => {
   scheduleCloudSave();
 });
 sheetBackdrop.addEventListener("click", closeSheet);
+document.addEventListener("click", (event) => {
+  if (!projectMenu.classList.contains("is-open")) return;
+  if (projectMenu.contains(event.target) || projectMenuBtn.contains(event.target)) return;
+  closeProjectMenu();
+});
 
 document.querySelectorAll('[name="priceMode"]').forEach((input) => {
   input.addEventListener("change", updateEmployeeMode);
@@ -1278,10 +1346,8 @@ document.querySelector("#projectForm").addEventListener("submit", (event) => {
 
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("is-selected"));
-    document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("is-active"));
-    tab.classList.add("is-selected");
-    document.querySelector(`#${tab.dataset.tab}Panel`).classList.add("is-active");
+    closeProjectMenu();
+    showTab(tab.dataset.tab);
   });
 });
 
@@ -1415,14 +1481,7 @@ document.querySelector("#quickForm").addEventListener("submit", (event) => {
   scheduleCloudSave();
 });
 
-document.querySelector("#addNoteBtn").addEventListener("click", () => {
-  const text = window.prompt("Nouvelle note");
-  if (!text?.trim()) return;
-  if (!Array.isArray(currentProject.notes)) currentProject.notes = [];
-  currentProject.notes.unshift({ text: text.trim(), done: false });
-  renderNotes();
-  scheduleCloudSave();
-});
+document.querySelector("#addNoteBtn").addEventListener("click", addNote);
 
 async function initApp() {
   await loadProjectsFromCloud();
