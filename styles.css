@@ -374,11 +374,35 @@ svg {
   flex: 1;
 }
 
+.project-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .detail-header h1 {
   overflow: hidden;
   font-size: 25px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.inline-edit-button {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink);
+  box-shadow: 0 8px 18px rgba(53, 48, 38, 0.09);
+}
+
+.inline-edit-button svg {
+  width: 17px;
+  height: 17px;
 }
 
 .profit-card {

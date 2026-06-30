@@ -136,6 +136,7 @@ let currentBudgetIndex = null;
 let currentDetailIndex = null;
 let currentScheduleIndex = null;
 let formMode = "budget";
+let projectFormMode = "create";
 
 const money = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -289,6 +290,10 @@ function shortDate(value) {
     day: "2-digit",
     month: "short"
   }).format(new Date(`${value}T12:00:00`)).replace(".", "");
+}
+
+function projectStatusLabel(status) {
+  return status === "done" ? "Terminé" : "Actif";
 }
 
 function makeProjectId(name) {
@@ -1062,17 +1067,70 @@ function closeSheet() {
   projectSheet.classList.remove("is-open");
   document.querySelector("#quickForm").reset();
   resetEmployeePricing();
+  projectFormMode = "create";
 }
 
 function openProjectSheet() {
+  projectFormMode = "create";
   document.querySelector("#projectForm").reset();
+  document.querySelector("#projectSheetEyebrow").textContent = "Nouveau";
+  document.querySelector("#projectSheetTitle").textContent = "Créer un projet";
+  document.querySelector("#projectSubmitBtn").textContent = "Créer";
+  document.querySelector('[name="projectStatus"]').value = "active";
   document.querySelector('[name="projectDate"]').value = isoDate(new Date());
   sheetBackdrop.classList.add("is-open");
   projectSheet.classList.add("is-open");
 }
 
+function openEditProjectSheet() {
+  projectFormMode = "edit";
+  const form = document.querySelector("#projectForm");
+  form.reset();
+  document.querySelector("#projectSheetEyebrow").textContent = "Projet";
+  document.querySelector("#projectSheetTitle").textContent = "Modifier le projet";
+  document.querySelector("#projectSubmitBtn").textContent = "Enregistrer";
+  document.querySelector('[name="projectType"]').value = currentProject.type;
+  document.querySelector('[name="projectStatus"]').value = currentProject.status || "active";
+  document.querySelector('[name="projectName"]').value = currentProject.name;
+  document.querySelector('[name="projectDate"]').value = parseDisplayDate(currentProject.date);
+  document.querySelector('[name="projectPeopleNew"]').value = currentProject.people || 0;
+  document.querySelector('[name="projectSold"]').value = currentProject.sold || 0;
+  sheetBackdrop.classList.add("is-open");
+  projectSheet.classList.add("is-open");
+}
+
+function confirmProjectChanges(nextProject) {
+  const changes = [];
+  if (currentProject.type !== nextProject.type) changes.push(`Type : ${currentProject.type} → ${nextProject.type}`);
+  if ((currentProject.status || "active") !== nextProject.status) changes.push(`Statut : ${projectStatusLabel(currentProject.status)} → ${projectStatusLabel(nextProject.status)}`);
+  if (currentProject.name !== nextProject.name) changes.push(`Nom : ${currentProject.name} → ${nextProject.name}`);
+  if (currentProject.date !== nextProject.date) changes.push(`Date : ${currentProject.date} → ${nextProject.date}`);
+  if (Number(currentProject.people || 0) !== nextProject.people) changes.push(`Participants : ${currentProject.people || 0} → ${nextProject.people}`);
+  if (Number(currentProject.sold || 0) !== nextProject.sold) changes.push(`Prix client : ${money.format(currentProject.sold || 0)} → ${money.format(nextProject.sold)}`);
+  if (!changes.length) return { hasChanges: false, confirmed: true };
+  return {
+    hasChanges: true,
+    confirmed: window.confirm(`Confirmer les modifications ?\n\n${changes.join("\n")}`)
+  };
+}
+
+function applyProjectChanges(nextProject) {
+  currentProject.type = nextProject.type;
+  currentProject.status = nextProject.status;
+  currentProject.name = nextProject.name;
+  currentProject.date = nextProject.date;
+  currentProject.people = nextProject.people;
+  currentProject.sold = nextProject.sold;
+  ensureClientPayments(currentProject);
+  closeSheet();
+  renderHome();
+  renderDetail();
+  scheduleCloudSave();
+}
+
 document.querySelector("#backBtn").addEventListener("click", openHome);
 document.querySelector("#exportProjectBtn").addEventListener("click", exportCurrentProject);
+document.querySelector("#editProjectBtn").addEventListener("click", openEditProjectSheet);
 document.querySelector("#floatingAdd").addEventListener("click", () => openSheet());
 document.querySelector("#addForgottenBtn").addEventListener("click", () => openSheet());
 document.querySelectorAll(".addLineBtn").forEach((button) => button.addEventListener("click", () => openSheet()));
@@ -1169,15 +1227,35 @@ document.querySelector("#projectForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const type = form.get("projectType").toString();
+  const status = form.get("projectStatus").toString();
   const name = form.get("projectName").toString().trim();
   const dateValue = form.get("projectDate").toString();
   const people = Number(form.get("projectPeopleNew") || 0);
   const sold = Number(form.get("projectSold") || 0);
   if (!name) return;
 
+  if (projectFormMode === "edit") {
+    const nextProject = {
+      type,
+      status,
+      name,
+      date: shortDate(dateValue),
+      people,
+      sold
+    };
+    const confirmation = confirmProjectChanges(nextProject);
+    if (!confirmation.confirmed) return;
+    if (confirmation.hasChanges) {
+      applyProjectChanges(nextProject);
+    } else {
+      closeSheet();
+    }
+    return;
+  }
+
   const project = {
     id: makeProjectId(name),
-    status: "active",
+    status,
     type,
     name,
     date: shortDate(dateValue),
