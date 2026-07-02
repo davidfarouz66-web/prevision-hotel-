@@ -581,6 +581,36 @@ svg {
   font-size: 24px;
 }
 
+.profit-summary-block {
+  background: #203238;
+  color: #fff;
+}
+
+.profit-summary-block h3,
+.profit-summary-block strong {
+  color: #fff;
+}
+
+.profit-summary-block span {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.profit-summary-block div {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.profit-summary-block .summary-balance {
+  background: rgba(223, 243, 232, 0.14);
+}
+
+.profit-summary-block .summary-balance span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.profit-summary-block .summary-balance strong {
+  font-size: 28px;
+}
+
 .result-card {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

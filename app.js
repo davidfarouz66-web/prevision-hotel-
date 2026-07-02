@@ -637,9 +637,14 @@ function renderDetail() {
       ["Total prévu", total.planned],
       ["Déjà payé", total.paid],
       ["Reste à payer", total.remainingToPay]
+    ]],
+    ["Résultat", [
+      ["Prix client", currentProject.sold],
+      ["Dépenses prévues", total.planned],
+      ["Bénéfice prévu", total.profit]
     ]]
   ].map(([title, rows], index) => `
-    <button class="summary-block ${index === 0 ? "client-block" : "expense-block"}" ${index === 0 ? 'id="clientSummaryBtn" type="button"' : 'type="button"'}>
+    <button class="summary-block ${index === 0 ? "client-block" : ""} ${index === 2 ? "profit-summary-block" : "expense-block"}" ${index === 0 ? 'id="clientSummaryBtn" type="button"' : 'type="button"'}>
       <h3>${title}</h3>
       ${rows.map(([label, value], rowIndex) => `
         <div class="${rowIndex === 2 ? "summary-balance" : ""}">
