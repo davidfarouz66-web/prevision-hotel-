@@ -172,6 +172,10 @@ const workCalendar = document.querySelector("#workCalendar");
 const calendarGrid = document.querySelector("#calendarGrid");
 const calendarMonth = document.querySelector("#calendarMonth");
 const rangeHint = document.querySelector("#rangeHint");
+const amountInput = document.querySelector('[name="amount"]');
+const paidInput = document.querySelector('[name="paid"]');
+const settledPaymentInput = document.querySelector('[name="settledPayment"]');
+const settledToggle = document.querySelector("#settledToggle");
 let calendarCursor = new Date();
 let rangeStart = null;
 let rangeEnd = null;
@@ -534,8 +538,8 @@ function resetEmployeePricing() {
   dayRateField.classList.add("is-hidden");
   rangePicker.classList.add("is-hidden");
   workCalendar.classList.add("is-hidden");
-  document.querySelector('[name="amount"]').readOnly = false;
-  document.querySelector('[name="amount"]').placeholder = "450";
+  amountInput.readOnly = false;
+  amountInput.placeholder = "450";
   document.querySelectorAll('[name="priceMode"]').forEach((input) => {
     input.checked = input.value === "global";
   });
@@ -548,6 +552,30 @@ function resetEmployeePricing() {
   checkedWorkDays = null;
   setHiddenRangeInputs();
   workCalendar.innerHTML = "";
+}
+
+function resetSettledToggle() {
+  settledPaymentInput.checked = false;
+  settledToggle.classList.remove("is-hidden");
+  paidInput.readOnly = false;
+}
+
+function settledAmount() {
+  const amount = Number(amountInput.value || 0);
+  if (formMode === "edit-detail" && currentBudgetIndex !== null && currentDetailIndex !== null) {
+    const detail = currentProject.budget[currentBudgetIndex].details[currentDetailIndex];
+    return Math.max(amount - detailPaid(detail), 0);
+  }
+  return amount;
+}
+
+function syncSettledPayment() {
+  if (!settledPaymentInput.checked) {
+    paidInput.readOnly = false;
+    return;
+  }
+  paidInput.value = settledAmount();
+  paidInput.readOnly = true;
 }
 
 function setupEmployeePricing() {
@@ -620,7 +648,7 @@ function updateEmployeeMode() {
   dayRateField.classList.toggle("is-hidden", !isDayMode);
   rangePicker.classList.toggle("is-hidden", !isDayMode);
   workCalendar.classList.toggle("is-hidden", !isDayMode);
-  document.querySelector('[name="amount"]').readOnly = isDayMode;
+  amountInput.readOnly = isDayMode;
   if (isDayMode) {
     if (!rangeStart) {
       const today = new Date();
@@ -637,7 +665,8 @@ function updateEmployeeTotal() {
   const rate = Number(document.querySelector('[name="dayRate"]').value || 0);
   const employeeCount = Math.max(Number(document.querySelector('[name="employeeCount"]').value || 1), 1);
   const days = document.querySelectorAll('[name="workDay"]:checked').length;
-  document.querySelector('[name="amount"]').value = rate * days * employeeCount;
+  amountInput.value = rate * days * employeeCount;
+  syncSettledPayment();
 }
 
 function totals(project) {
@@ -997,6 +1026,7 @@ function openSheet(mode = "budget") {
   currentDetailIndex = null;
   if (mode !== "edit-schedule") currentScheduleIndex = null;
   resetEmployeePricing();
+  resetSettledToggle();
   const isDetailMode = mode === "detail";
   const isEditMode = mode === "edit-detail";
   const isScheduleMode = mode === "schedule" || mode === "edit-schedule";
@@ -1023,6 +1053,7 @@ function openSheet(mode = "budget") {
   document.querySelector("#amountLabel").firstChild.textContent = isScheduleMode ? "Montant de l'échéance" : "Prix prévu";
   document.querySelector("#paidLabel").firstChild.textContent = isEditMode ? "Nouveau paiement" : "Déjà payé";
   document.querySelector("#paidLabel").classList.toggle("is-hidden", isScheduleMode);
+  settledToggle.classList.toggle("is-hidden", isScheduleMode);
   document.querySelector("#kindField").classList.toggle("is-hidden", isDetailMode || isEditMode);
   document.querySelector("#dueDateField").classList.toggle("is-hidden", !isScheduleMode);
   document.querySelector("#categoryField").classList.toggle("is-hidden", isDetailMode || isEditMode || isScheduleMode);
@@ -1139,6 +1170,7 @@ function openEditDetail(detailIndex) {
   document.querySelector("#labelField").firstChild.textContent = "Nom";
   document.querySelector("#amountLabel").firstChild.textContent = "Prix prévu";
   document.querySelector("#paidLabel").firstChild.textContent = "Nouveau paiement";
+  resetSettledToggle();
   document.querySelector("#kindField").classList.add("is-hidden");
   document.querySelector("#categoryField").classList.add("is-hidden");
   document.querySelector('[name="label"]').value = detail.name;
@@ -1241,6 +1273,7 @@ function closeSheet() {
   projectSheet.classList.remove("is-open");
   document.querySelector("#quickForm").reset();
   resetEmployeePricing();
+  resetSettledToggle();
   projectFormMode = "create";
 }
 
@@ -1416,6 +1449,8 @@ document.querySelectorAll('[name="priceMode"]').forEach((input) => {
 });
 document.querySelector('[name="dayRate"]').addEventListener("input", updateEmployeeTotal);
 document.querySelector('[name="employeeCount"]').addEventListener("input", updateEmployeeTotal);
+amountInput.addEventListener("input", syncSettledPayment);
+settledPaymentInput.addEventListener("change", syncSettledPayment);
 document.querySelector("#prevMonth").addEventListener("click", () => {
   calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
   renderRangePicker();
