@@ -291,6 +291,16 @@ svg {
   gap: 12px;
 }
 
+.empty-projects {
+  padding: 16px;
+  border: 1px dashed rgba(31, 42, 46, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 750;
+}
+
 .project-card {
   min-height: 132px;
   padding: 16px;
@@ -427,11 +437,28 @@ svg {
   background: rgba(31, 42, 46, 0.07);
 }
 
+.project-menu .danger-menu-action {
+  margin-top: 5px;
+  border-top: 1px solid rgba(155, 51, 40, 0.16);
+  border-radius: 0 0 13px 13px;
+  padding-top: 7px;
+  color: #9b3328;
+}
+
+.project-menu .danger-menu-action:active,
+.project-menu .danger-menu-action:hover {
+  background: rgba(155, 51, 40, 0.1);
+}
+
 .project-menu svg {
   flex: 0 0 19px;
   width: 19px;
   height: 19px;
   color: var(--blue);
+}
+
+.project-menu .danger-menu-action svg {
+  color: #9b3328;
 }
 
 .project-menu button:nth-child(6),

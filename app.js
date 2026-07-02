@@ -137,6 +137,9 @@ let currentDetailIndex = null;
 let currentScheduleIndex = null;
 let formMode = "budget";
 let projectFormMode = "create";
+const demoProjectNames = ["marrakech pessah", "reception cohen", "week-end deauville"];
+projects = projects.filter((project) => !isDemoProject(project));
+currentProject = projects[0] || null;
 
 const money = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -202,8 +205,27 @@ function readProjectsFromLocal() {
   }
 }
 
+function normalizedText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function isDemoProject(project) {
+  return demoProjectNames.includes(normalizedText(project?.name));
+}
+
 function removeTestDataFromProjects(projectList) {
   let changed = false;
+  const beforeProjects = projectList.length;
+  for (let index = projectList.length - 1; index >= 0; index -= 1) {
+    if (isDemoProject(projectList[index])) {
+      projectList.splice(index, 1);
+    }
+  }
+  changed = changed || projectList.length !== beforeProjects;
   const isTestText = (value) => typeof value === "string" && value.includes("TEST SAUVEGARDE LOCALE");
   projectList.forEach((project) => {
     if (Array.isArray(project.budget)) {
@@ -307,6 +329,7 @@ async function loadProjectsFromCloud() {
   if (removedTestDataOnLoad) {
     removedTestDataOnLoad = false;
     saveProjectsToLocal();
+    window.setTimeout(saveProjectsToCloud, 250);
   }
 
   if (hasLocalSave && lastLocalUpdatedAt) {
@@ -631,7 +654,7 @@ function totals(project) {
 function renderHome() {
   const renderProjectCard = (project) => {
     const total = totals(project);
-    const progress = Math.min(Math.round((project.collected / project.sold) * 100), 100);
+    const progress = project.sold ? Math.min(Math.round((project.collected / project.sold) * 100), 100) : 0;
     return `
       <button class="project-card" data-project="${project.id}">
         <div class="project-main">
@@ -648,8 +671,14 @@ function renderHome() {
     `;
   };
 
-  projectList.innerHTML = projects.filter((project) => project.status !== "done").map(renderProjectCard).join("");
-  completedProjectList.innerHTML = projects.filter((project) => project.status === "done").map(renderProjectCard).join("");
+  const activeProjects = projects.filter((project) => project.status !== "done");
+  const completedProjects = projects.filter((project) => project.status === "done");
+  projectList.innerHTML = activeProjects.length
+    ? activeProjects.map(renderProjectCard).join("")
+    : `<div class="empty-projects">Aucun séjour pour l'instant. Appuie sur Nouveau.</div>`;
+  completedProjectList.innerHTML = completedProjects.length
+    ? completedProjects.map(renderProjectCard).join("")
+    : `<div class="empty-projects">Aucun séjour terminé.</div>`;
 
   document.querySelectorAll("[data-project]").forEach((card) => {
     card.addEventListener("click", () => {
@@ -942,6 +971,17 @@ function openHome() {
   detailScreen.classList.remove("is-active");
   homeScreen.classList.add("is-active");
   renderHome();
+}
+
+function deleteCurrentProject() {
+  if (!currentProject) return;
+  const confirmed = window.confirm(`Supprimer le projet "${currentProject.name}" ?`);
+  if (!confirmed) return;
+  projects = projects.filter((project) => project.id !== currentProject.id);
+  currentProject = projects[0] || null;
+  closeSheet();
+  openHome();
+  scheduleCloudSave();
 }
 
 function showTab(tabName) {
@@ -1294,6 +1334,8 @@ function handleProjectMenuAction(action) {
     openProjectSheet();
   } else if (action === "home") {
     openHome();
+  } else if (action === "delete-project") {
+    deleteCurrentProject();
   }
 }
 
