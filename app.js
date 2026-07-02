@@ -181,6 +181,7 @@ const LOCAL_STATE_KEY = "odem-event-projects";
 let saveTimer = null;
 let isLoadingCloudData = false;
 let lastLocalUpdatedAt = null;
+let removedTestDataOnLoad = false;
 
 function setSaveStatus(message, state = "idle") {
   if (!saveStatus) return;
@@ -201,8 +202,38 @@ function readProjectsFromLocal() {
   }
 }
 
+function removeTestDataFromProjects(projectList) {
+  let changed = false;
+  const isTestText = (value) => typeof value === "string" && value.includes("TEST SAUVEGARDE LOCALE");
+  projectList.forEach((project) => {
+    if (Array.isArray(project.budget)) {
+      const beforeBudget = project.budget.length;
+      project.budget = project.budget.filter((item) => !isTestText(item.label) && !isTestText(item.category));
+      changed = changed || project.budget.length !== beforeBudget;
+      project.budget.forEach((item) => {
+        if (!Array.isArray(item.details)) return;
+        const beforeDetails = item.details.length;
+        item.details = item.details.filter((detail) => !isTestText(detail.name) && !isTestText(detail.info));
+        changed = changed || item.details.length !== beforeDetails;
+      });
+    }
+    if (Array.isArray(project.payments)) {
+      const beforePayments = project.payments.length;
+      project.payments = project.payments.filter((payment) => !isTestText(payment.label));
+      changed = changed || project.payments.length !== beforePayments;
+    }
+    if (Array.isArray(project.notes)) {
+      const beforeNotes = project.notes.length;
+      project.notes = project.notes.filter((note) => !isTestText(note.text));
+      changed = changed || project.notes.length !== beforeNotes;
+    }
+  });
+  return changed;
+}
+
 function applySavedProjects(saved) {
   if (!saved || !Array.isArray(saved.projects) || !saved.projects.length) return false;
+  removedTestDataOnLoad = removeTestDataFromProjects(saved.projects) || removedTestDataOnLoad;
   projects = saved.projects;
   currentProject = projects[0];
   lastLocalUpdatedAt = saved.updatedAt || lastLocalUpdatedAt;
@@ -271,6 +302,11 @@ async function loadProjectsFromCloud() {
     }
   } finally {
     isLoadingCloudData = false;
+  }
+
+  if (removedTestDataOnLoad) {
+    removedTestDataOnLoad = false;
+    saveProjectsToLocal();
   }
 
   if (hasLocalSave && lastLocalUpdatedAt) {
