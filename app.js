@@ -155,6 +155,7 @@ const urgentPayments = document.querySelector("#urgentPayments");
 const noteList = document.querySelector("#noteList");
 const projectMenu = document.querySelector("#projectMenu");
 const projectMenuBtn = document.querySelector("#projectMenuBtn");
+const saveStatus = document.querySelector("#saveStatus");
 const bottomSheet = document.querySelector("#bottomSheet");
 const detailSheet = document.querySelector("#detailSheet");
 const clientSheet = document.querySelector("#clientSheet");
@@ -176,8 +177,48 @@ let checkedWorkDays = null;
 const SUPABASE_URL = "https://aykbzbeerstjmhworody.supabase.co";
 const SUPABASE_KEY = "sb_publishable_vioHpKZRfR_EcTgDuzyBJQ_l9xNxV5I";
 const APP_STATE_ID = "odem-event";
+const LOCAL_STATE_KEY = "odem-event-projects";
 let saveTimer = null;
 let isLoadingCloudData = false;
+let lastLocalUpdatedAt = null;
+
+function setSaveStatus(message, state = "idle") {
+  if (!saveStatus) return;
+  saveStatus.textContent = message;
+  saveStatus.dataset.state = state;
+}
+
+function readProjectsFromLocal() {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_STATE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!Array.isArray(saved.projects) || !saved.projects.length) return null;
+    return saved;
+  } catch (error) {
+    console.warn("Sauvegarde locale illisible.", error);
+    return null;
+  }
+}
+
+function applySavedProjects(saved) {
+  if (!saved || !Array.isArray(saved.projects) || !saved.projects.length) return false;
+  projects = saved.projects;
+  currentProject = projects[0];
+  lastLocalUpdatedAt = saved.updatedAt || lastLocalUpdatedAt;
+  return true;
+}
+
+function saveProjectsToLocal(updatedAt = new Date().toISOString()) {
+  try {
+    lastLocalUpdatedAt = updatedAt;
+    window.localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({ projects, updatedAt }));
+    setSaveStatus("Sauvegardé sur ce téléphone", "local");
+  } catch (error) {
+    console.warn("Impossible de sauvegarder sur ce téléphone.", error);
+    setSaveStatus("Sauvegarde téléphone bloquée", "error");
+  }
+}
 
 async function supabaseRequest(path, options = {}) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -190,48 +231,77 @@ async function supabaseRequest(path, options = {}) {
     }
   });
   if (!response.ok) {
-    throw new Error(`Supabase ${response.status}`);
+    const error = new Error(`Supabase ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return response;
 }
 
 async function loadProjectsFromCloud() {
   isLoadingCloudData = true;
+  const localSave = readProjectsFromLocal();
+  const hasLocalSave = applySavedProjects(localSave);
+  if (hasLocalSave) {
+    setSaveStatus("Sauvegarde du téléphone chargée", "local");
+  }
+
   try {
-    const response = await supabaseRequest(`app_state?id=eq.${APP_STATE_ID}&select=data`);
+    const response = await supabaseRequest(`app_state?id=eq.${APP_STATE_ID}&select=data,updated_at`);
     const rows = await response.json();
     const savedProjects = rows?.[0]?.data?.projects;
+    const cloudUpdatedAt = rows?.[0]?.updated_at || rows?.[0]?.data?.updatedAt || null;
+    const cloudIsNewer = cloudUpdatedAt && (!lastLocalUpdatedAt || new Date(cloudUpdatedAt) > new Date(lastLocalUpdatedAt));
     if (Array.isArray(savedProjects) && savedProjects.length) {
-      projects = savedProjects;
-      currentProject = projects[0];
+      if (!hasLocalSave || cloudIsNewer) {
+        applySavedProjects({ projects: savedProjects, updatedAt: cloudUpdatedAt });
+        saveProjectsToLocal(cloudUpdatedAt || new Date().toISOString());
+        setSaveStatus("Sauvegarde en ligne chargée", "online");
+      } else {
+        setSaveStatus("Version téléphone gardée", "local");
+      }
     }
     await keepSupabaseAwake();
   } catch (error) {
     console.warn("Sauvegarde en ligne non disponible pour l'instant.", error);
+    if (error.status === 404) {
+      setSaveStatus(hasLocalSave ? "Téléphone OK, en ligne à configurer" : "En ligne à configurer", hasLocalSave ? "local" : "error");
+    } else {
+      setSaveStatus(hasLocalSave ? "Sauvegardé sur ce téléphone" : "Hors ligne", hasLocalSave ? "local" : "error");
+    }
   } finally {
     isLoadingCloudData = false;
+  }
+
+  if (hasLocalSave && lastLocalUpdatedAt) {
+    window.setTimeout(saveProjectsToCloud, 250);
   }
 }
 
 async function saveProjectsToCloud() {
   if (isLoadingCloudData) return;
+  setSaveStatus("Sauvegarde en ligne...", "saving");
   try {
+    const updatedAt = lastLocalUpdatedAt || new Date().toISOString();
     await supabaseRequest("app_state", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates" },
       body: JSON.stringify({
         id: APP_STATE_ID,
-        data: { projects },
-        updated_at: new Date().toISOString()
+        data: { projects, updatedAt },
+        updated_at: updatedAt
       })
     });
+    setSaveStatus("Sauvegardé en ligne", "online");
   } catch (error) {
     console.warn("Impossible de sauvegarder en ligne pour l'instant.", error);
+    setSaveStatus(error.status === 404 ? "Téléphone OK, en ligne à configurer" : "Sauvegardé sur ce téléphone", "local");
   }
 }
 
 function scheduleCloudSave() {
   if (isLoadingCloudData) return;
+  saveProjectsToLocal();
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(saveProjectsToCloud, 450);
 }
@@ -1253,6 +1323,9 @@ document.addEventListener("click", (event) => {
   if (!projectMenu.classList.contains("is-open")) return;
   if (projectMenu.contains(event.target) || projectMenuBtn.contains(event.target)) return;
   closeProjectMenu();
+});
+window.addEventListener("beforeunload", () => {
+  if (!isLoadingCloudData) saveProjectsToLocal(lastLocalUpdatedAt || new Date().toISOString());
 });
 
 document.querySelectorAll('[name="priceMode"]').forEach((input) => {
