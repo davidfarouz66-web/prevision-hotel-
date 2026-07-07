@@ -32,7 +32,7 @@ Ce script crée :
 Le projet contient :
 
 - `vercel.json` avec un cron quotidien ;
-- `api/keepalive.js` pour maintenir une activité Supabase.
+- `api/keepalive.js` pour maintenir une activité Supabase même si personne n'ouvre le CRM.
 
 Variables recommandées dans Vercel :
 
@@ -40,6 +40,14 @@ Variables recommandées dans Vercel :
 SUPABASE_URL=https://aykbzbeerstjmhworody.supabase.co
 SUPABASE_KEY=sb_publishable_vioHpKZRfR_EcTgDuzyBJQ_l9xNxV5I
 ```
+
+Le keepalive passe par :
+
+```text
+/api/keepalive
+```
+
+Vercel l'appelle automatiquement chaque jour via `vercel.json`.
 
 ## Note
 
