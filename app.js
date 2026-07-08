@@ -860,6 +860,11 @@ function ensureMenus(project) {
   project.menus.forEach((menu) => {
     if (!menu.serviceMode) menu.serviceMode = "mixte";
     if (!Array.isArray(menu.sections)) menu.sections = defaultMenuSections(project.type);
+    menu.sections = menu.sections.filter((section) => {
+      const title = normalizedText(section.title);
+      const isEmptyKiddouch = title === "kiddouch / buffet" && !String(section.content || "").trim();
+      return !isEmptyKiddouch;
+    });
     menu.sections.forEach((section) => {
       if (!section.serviceMode) section.serviceMode = "selon-menu";
     });
@@ -896,7 +901,7 @@ function serviceModeLabel(value) {
 function defaultMenuSections(type) {
   const titles = type === "Réception"
     ? ["Cocktail / apéritif", "Buffet / entrée", "Plat principal", "Dessert", "Boissons", "Notes service"]
-    : ["Petit déjeuner", "Déjeuner", "Kiddouch / buffet", "Dîner", "Enfants", "Notes chef"];
+    : ["Petit déjeuner", "Déjeuner", "Dîner", "Enfants", "Boissons", "Notes chef"];
   return titles.map((title) => ({ title, content: "", serviceMode: title.toLowerCase().includes("buffet") ? "buffet" : "selon-menu" }));
 }
 
