@@ -156,6 +156,7 @@ const resultCard = document.querySelector("#resultCard");
 const fullBudget = document.querySelector("#fullBudget");
 const urgentPayments = document.querySelector("#urgentPayments");
 const noteList = document.querySelector("#noteList");
+const menuList = document.querySelector("#menuList");
 const projectMenu = document.querySelector("#projectMenu");
 const projectMenuBtn = document.querySelector("#projectMenuBtn");
 const saveStatus = document.querySelector("#saveStatus");
@@ -215,6 +216,14 @@ function normalizedText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function isDemoProject(project) {
@@ -779,6 +788,7 @@ function renderDetail() {
   `;
   urgentPayments.innerHTML = currentProject.payments.slice(0, 3).map(renderPayment).join("");
   renderNotes();
+  renderMenus();
 
   categorySelect.innerHTML = currentProject.budget.map((item) => (
     `<option value="${item.category}">${item.category}</option>`
@@ -822,6 +832,208 @@ function addNote() {
   currentProject.notes.unshift({ text: text.trim(), done: false });
   renderNotes();
   scheduleCloudSave();
+}
+
+function ensureMenus(project) {
+  if (!Array.isArray(project.menus)) project.menus = [];
+  project.menus.forEach((menu) => {
+    if (!Array.isArray(menu.sections)) menu.sections = defaultMenuSections(project.type);
+  });
+  return project.menus;
+}
+
+function defaultMenuSections(type) {
+  const titles = type === "Réception"
+    ? ["Cocktail / apéritif", "Buffet / entrée", "Plat principal", "Dessert", "Boissons", "Notes service"]
+    : ["Petit déjeuner", "Déjeuner", "Kiddouch / buffet", "Dîner", "Enfants", "Notes chef"];
+  return titles.map((title) => ({ title, content: "" }));
+}
+
+function renderMenus() {
+  const menus = ensureMenus(currentProject);
+  menuList.innerHTML = menus.length ? menus.map((menu, menuIndex) => `
+    <article class="menu-card" data-menu-index="${menuIndex}">
+      <header>
+        <div>
+          <span class="type-pill">Fiche chef</span>
+          <input class="menu-title-input" value="${escapeHtml(menu.title)}" data-menu-field="title" aria-label="Titre du menu" />
+        </div>
+        <button class="icon-button ghost" type="button" data-print-menu="${menuIndex}" aria-label="Imprimer ce menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        </button>
+      </header>
+      <div class="menu-meta-grid">
+        <label>
+          Date / service
+          <input value="${escapeHtml(menu.date || "")}" data-menu-field="date" placeholder="Vendredi soir" />
+        </label>
+        <label>
+          Personnes
+          <input type="number" min="0" step="1" value="${Number(menu.people || 0)}" data-menu-field="people" />
+        </label>
+      </div>
+      <div class="menu-sections">
+        ${menu.sections.map((section, sectionIndex) => `
+          <div class="menu-section" data-section-index="${sectionIndex}">
+            <div class="menu-section-title-row">
+              <input value="${escapeHtml(section.title)}" data-menu-section-field="title" aria-label="Titre de la partie" />
+              <button type="button" class="icon-button ghost" data-delete-menu-section="${sectionIndex}" aria-label="Supprimer cette partie">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+              </button>
+            </div>
+            <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
+          </div>
+        `).join("")}
+      </div>
+      <label>
+        Notes importantes pour le chef
+        <textarea data-menu-field="notes" rows="3" placeholder="Allergies, horaires, dressage, enfants, remarques...">${escapeHtml(menu.notes || "")}</textarea>
+      </label>
+      <footer class="menu-card-actions">
+        <button type="button" class="secondary-button" data-add-menu-section="${menuIndex}">Ajouter une partie</button>
+        <button type="button" class="delete-button inline-delete" data-delete-menu="${menuIndex}">Supprimer</button>
+      </footer>
+    </article>
+  `).join("") : `<div class="empty-projects">Aucun menu. Appuie sur Ajouter pour créer une fiche chef.</div>`;
+
+  menuList.querySelectorAll("[data-menu-field]").forEach((field) => {
+    field.addEventListener("input", () => {
+      const card = field.closest("[data-menu-index]");
+      updateMenuField(Number(card.dataset.menuIndex), field.dataset.menuField, field.value);
+    });
+  });
+  menuList.querySelectorAll("[data-menu-section-field]").forEach((field) => {
+    field.addEventListener("input", () => {
+      const card = field.closest("[data-menu-index]");
+      const section = field.closest("[data-section-index]");
+      updateMenuSection(Number(card.dataset.menuIndex), Number(section.dataset.sectionIndex), field.dataset.menuSectionField, field.value);
+    });
+  });
+  menuList.querySelectorAll("[data-add-menu-section]").forEach((button) => {
+    button.addEventListener("click", () => addMenuSection(Number(button.dataset.addMenuSection)));
+  });
+  menuList.querySelectorAll("[data-delete-menu-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const card = button.closest("[data-menu-index]");
+      deleteMenuSection(Number(card.dataset.menuIndex), Number(button.dataset.deleteMenuSection));
+    });
+  });
+  menuList.querySelectorAll("[data-delete-menu]").forEach((button) => {
+    button.addEventListener("click", () => deleteMenu(Number(button.dataset.deleteMenu)));
+  });
+  menuList.querySelectorAll("[data-print-menu]").forEach((button) => {
+    button.addEventListener("click", () => printMenu(Number(button.dataset.printMenu)));
+  });
+}
+
+function addMenu() {
+  const title = window.prompt("Nom du menu", currentProject.type === "Réception" ? "Menu réception" : "Menu Chabbat");
+  if (!title?.trim()) return;
+  const date = window.prompt("Date ou service", currentProject.date || "");
+  const menus = ensureMenus(currentProject);
+  menus.unshift({
+    id: makeProjectId(title),
+    title: title.trim(),
+    date: date?.trim() || currentProject.date || "",
+    people: currentProject.people || 0,
+    notes: "",
+    sections: defaultMenuSections(currentProject.type)
+  });
+  renderMenus();
+  scheduleCloudSave();
+}
+
+function updateMenuField(menuIndex, field, value) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  if (!menu) return;
+  menu[field] = field === "people" ? Number(value || 0) : value;
+  scheduleCloudSave();
+}
+
+function updateMenuSection(menuIndex, sectionIndex, field, value) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  if (!menu?.sections?.[sectionIndex]) return;
+  menu.sections[sectionIndex][field] = value;
+  scheduleCloudSave();
+}
+
+function addMenuSection(menuIndex) {
+  const title = window.prompt("Nom de la partie", "À préparer");
+  if (!title?.trim()) return;
+  const menu = ensureMenus(currentProject)[menuIndex];
+  if (!menu) return;
+  menu.sections.push({ title: title.trim(), content: "" });
+  renderMenus();
+  scheduleCloudSave();
+}
+
+function deleteMenuSection(menuIndex, sectionIndex) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  if (!menu?.sections?.[sectionIndex]) return;
+  const confirmed = window.confirm(`Supprimer "${menu.sections[sectionIndex].title}" ?`);
+  if (!confirmed) return;
+  menu.sections.splice(sectionIndex, 1);
+  renderMenus();
+  scheduleCloudSave();
+}
+
+function deleteMenu(menuIndex) {
+  const menus = ensureMenus(currentProject);
+  const menu = menus[menuIndex];
+  if (!menu) return;
+  const confirmed = window.confirm(`Supprimer le menu "${menu.title}" ?`);
+  if (!confirmed) return;
+  menus.splice(menuIndex, 1);
+  renderMenus();
+  scheduleCloudSave();
+}
+
+function printMenu(menuIndex) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  if (!menu) return;
+  const printRows = menu.sections.map((section) => `
+    <section>
+      <h2>${escapeHtml(section.title)}</h2>
+      <div class="content">${escapeHtml(section.content || "À compléter")}</div>
+    </section>
+  `).join("");
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(menu.title)} - fiche chef</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #1f2a2e; margin: 32px; }
+          header { border-bottom: 3px solid #1f2a2e; padding-bottom: 16px; margin-bottom: 20px; }
+          h1 { margin: 0 0 8px; font-size: 30px; }
+          .meta { color: #606866; font-size: 15px; }
+          section { break-inside: avoid; border: 1px solid #d8dedb; border-radius: 12px; padding: 14px; margin: 12px 0; }
+          h2 { margin: 0 0 10px; font-size: 18px; }
+          .content { white-space: pre-line; line-height: 1.45; font-size: 15px; }
+          .notes { background: #f4f7f1; }
+          button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 10px; background: #1f2a2e; color: white; font-weight: bold; }
+          @media print { button { display: none; } body { margin: 18px; } }
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print()">Imprimer</button>
+        <header>
+          <h1>${escapeHtml(menu.title)}</h1>
+          <div class="meta">${escapeHtml(currentProject.name)} · ${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes</div>
+        </header>
+        ${printRows}
+        <section class="notes">
+          <h2>Notes importantes</h2>
+          <div class="content">${escapeHtml(menu.notes || "Aucune note")}</div>
+        </section>
+      </body>
+    </html>
+  `;
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
 }
 
 function exportCurrentProject() {
@@ -1523,6 +1735,7 @@ document.querySelector("#projectForm").addEventListener("submit", (event) => {
     collected: 0,
     clientPayments: [],
     notes: [],
+    menus: [],
     budget: starterBudget(type),
     payments: []
   };
@@ -1673,6 +1886,7 @@ document.querySelector("#quickForm").addEventListener("submit", (event) => {
 });
 
 document.querySelector("#addNoteBtn").addEventListener("click", addNote);
+document.querySelector("#addMenuBtn").addEventListener("click", addMenu);
 
 async function initApp() {
   await loadProjectsFromCloud();
