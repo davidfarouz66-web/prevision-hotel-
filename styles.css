@@ -833,6 +833,53 @@ svg {
   gap: 14px;
 }
 
+.menu-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.menu-day {
+  display: grid;
+  align-content: start;
+  min-height: 78px;
+  padding: 7px 5px;
+  border: 1px solid rgba(31, 42, 46, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  text-align: left;
+}
+
+.menu-day.is-selected {
+  border-color: rgba(31, 157, 114, 0.42);
+  background: var(--mint);
+}
+
+.menu-day span {
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.menu-day strong,
+.menu-day small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-day strong {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.menu-day small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 760;
+}
+
 .menu-card {
   display: grid;
   gap: 12px;

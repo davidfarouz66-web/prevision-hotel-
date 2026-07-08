@@ -912,13 +912,56 @@ function makeMenuDay(title, date = "", type = currentProject.type) {
   };
 }
 
-function renderMenus() {
-  const menus = ensureMenus(currentProject);
-  if (currentMenuIndex !== null && !menus[currentMenuIndex]) currentMenuIndex = null;
-  menuList.innerHTML = menus.length ? menus.map((menu, menuIndex) => `
-    <article class="menu-card ${currentMenuIndex === menuIndex ? "is-open" : "is-compact"}" data-menu-index="${menuIndex}">
+function menuPrintHtml(menu, includeButton = true) {
+  const printRows = menu.sections.map((section) => `
+    <section>
+      <h2>${escapeHtml(section.title)} <span>${escapeHtml(serviceModeLabel(section.serviceMode))}</span></h2>
+      <div class="content">${escapeHtml(section.content || "À compléter")}</div>
+    </section>
+  `).join("");
+  return `
+    <article class="print-day">
+      ${includeButton ? `<button onclick="window.print()">Imprimer</button>` : ""}
       <header>
-        <button class="menu-summary" type="button" data-open-menu="${menuIndex}">
+        <h1>${escapeHtml(menu.title)}</h1>
+        <div class="meta">${escapeHtml(currentProject.name)} · ${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes · Service : ${escapeHtml(serviceModeLabel(menu.serviceMode))}</div>
+      </header>
+      <main>
+        ${printRows}
+        <section class="notes">
+          <h2>Notes importantes</h2>
+          <div class="content">${escapeHtml(menu.notes || "Aucune note")}</div>
+        </section>
+      </main>
+    </article>
+  `;
+}
+
+function menuPrintStyles() {
+  return `
+    @page { size: A4; margin: 10mm; }
+    body { font-family: Arial, sans-serif; color: #1f2a2e; margin: 0; }
+    .print-day { break-after: page; }
+    .print-day:last-child { break-after: auto; }
+    header { border-bottom: 3px solid #1f2a2e; padding-bottom: 10px; margin-bottom: 10px; }
+    h1 { margin: 0 0 6px; font-size: 25px; }
+    .meta { color: #606866; font-size: 13px; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    section { break-inside: avoid; border: 1px solid #d8dedb; border-radius: 10px; padding: 9px; min-height: 86px; }
+    h2 { margin: 0 0 6px; font-size: 15px; }
+    h2 span { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 999px; background: #eef4f0; color: #315747; font-size: 12px; vertical-align: middle; }
+    .content { white-space: pre-line; line-height: 1.32; font-size: 13px; }
+    .notes { grid-column: 1 / -1; min-height: 72px; background: #f4f7f1; }
+    button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 10px; background: #1f2a2e; color: white; font-weight: bold; margin-bottom: 10px; }
+    @media print { button { display: none; } }
+  `;
+}
+
+function renderMenuEditor(menu, menuIndex) {
+  return `
+    <article class="menu-card is-open" data-menu-index="${menuIndex}">
+      <header>
+        <button class="menu-summary" type="button" data-close-menu>
           <span class="type-pill">Fiche chef</span>
           <strong>${escapeHtml(menu.title)}</strong>
           <small>${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes · ${escapeHtml(serviceModeLabel(menu.serviceMode))}</small>
@@ -927,66 +970,88 @@ function renderMenus() {
           <button class="icon-button ghost" type="button" data-print-menu="${menuIndex}" aria-label="Imprimer ce menu">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
           </button>
-          <button class="icon-button ghost menu-toggle-button" type="button" data-open-menu="${menuIndex}" aria-label="Ouvrir ce menu">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${currentMenuIndex === menuIndex ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6"}"/></svg>
+          <button class="icon-button ghost" type="button" data-close-menu aria-label="Fermer ce menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
           </button>
         </div>
       </header>
-      ${currentMenuIndex === menuIndex ? `
-        <div class="menu-editor">
-          <input class="menu-title-input" value="${escapeHtml(menu.title)}" data-menu-field="title" aria-label="Titre du menu" />
-          <div class="menu-meta-grid">
-            <label>
-              Date / service
-              <input value="${escapeHtml(menu.date || "")}" data-menu-field="date" placeholder="Vendredi soir" />
-            </label>
-            <label>
-              Personnes
-              <input type="number" min="0" step="1" value="${Number(menu.people || 0)}" data-menu-field="people" />
-            </label>
-            <label>
-              Service du repas
-              <select data-menu-field="serviceMode">
-                ${serviceModeOptions(menu.serviceMode || "mixte")}
-              </select>
-            </label>
-          </div>
-          <div class="menu-sections">
-            ${menu.sections.map((section, sectionIndex) => `
-              <div class="menu-section" data-section-index="${sectionIndex}">
-                <div class="menu-section-title-row">
-                  <input value="${escapeHtml(section.title)}" data-menu-section-field="title" aria-label="Titre de la partie" />
-                  <button type="button" class="icon-button ghost" data-delete-menu-section="${sectionIndex}" aria-label="Supprimer cette partie">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-                  </button>
-                </div>
-                <label class="menu-service-select">
-                  Service de cette partie
-                  <select data-menu-section-field="serviceMode">
-                    ${serviceModeOptions(section.serviceMode || "selon-menu")}
-                  </select>
-                </label>
-                <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
-              </div>
-            `).join("")}
-          </div>
+      <div class="menu-editor">
+        <input class="menu-title-input" value="${escapeHtml(menu.title)}" data-menu-field="title" aria-label="Titre du menu" />
+        <div class="menu-meta-grid">
           <label>
-            Notes importantes pour le chef
-            <textarea data-menu-field="notes" rows="3" placeholder="Allergies, horaires, dressage, enfants, remarques...">${escapeHtml(menu.notes || "")}</textarea>
+            Date / service
+            <input value="${escapeHtml(menu.date || "")}" data-menu-field="date" placeholder="Vendredi soir" />
           </label>
-          <footer class="menu-card-actions">
-            <button type="button" class="secondary-button" data-add-menu-section="${menuIndex}">Ajouter une partie</button>
-            <button type="button" class="delete-button inline-delete" data-delete-menu="${menuIndex}">Supprimer</button>
-          </footer>
+          <label>
+            Personnes
+            <input type="number" min="0" step="1" value="${Number(menu.people || 0)}" data-menu-field="people" />
+          </label>
+          <label>
+            Service du repas
+            <select data-menu-field="serviceMode">
+              ${serviceModeOptions(menu.serviceMode || "mixte")}
+            </select>
+          </label>
         </div>
-      ` : ""}
+        <div class="menu-sections">
+          ${menu.sections.map((section, sectionIndex) => `
+            <div class="menu-section" data-section-index="${sectionIndex}">
+              <div class="menu-section-title-row">
+                <input value="${escapeHtml(section.title)}" data-menu-section-field="title" aria-label="Titre de la partie" />
+                <button type="button" class="icon-button ghost" data-delete-menu-section="${sectionIndex}" aria-label="Supprimer cette partie">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                </button>
+              </div>
+              <label class="menu-service-select">
+                Service de cette partie
+                <select data-menu-section-field="serviceMode">
+                  ${serviceModeOptions(section.serviceMode || "selon-menu")}
+                </select>
+              </label>
+              <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
+            </div>
+          `).join("")}
+        </div>
+        <label>
+          Notes importantes pour le chef
+          <textarea data-menu-field="notes" rows="3" placeholder="Allergies, horaires, dressage, enfants, remarques...">${escapeHtml(menu.notes || "")}</textarea>
+        </label>
+        <footer class="menu-card-actions">
+          <button type="button" class="secondary-button" data-add-menu-section="${menuIndex}">Ajouter une partie</button>
+          <button type="button" class="delete-button inline-delete" data-delete-menu="${menuIndex}">Supprimer</button>
+        </footer>
+      </div>
     </article>
-  `).join("") : `<div class="empty-projects">Aucun menu. Appuie sur Ajouter pour créer une fiche chef.</div>`;
+  `;
+}
+
+function renderMenus() {
+  const menus = ensureMenus(currentProject);
+  if (currentMenuIndex !== null && !menus[currentMenuIndex]) currentMenuIndex = null;
+  const calendar = menus.length ? `
+    <div class="menu-calendar">
+      ${menus.map((menu, menuIndex) => `
+        <button type="button" class="menu-day ${currentMenuIndex === menuIndex ? "is-selected" : ""}" data-open-menu="${menuIndex}">
+          <span>${escapeHtml(menu.isoDate ? new Date(`${menu.isoDate}T12:00:00`).getDate() : menuIndex + 1)}</span>
+          <strong>${escapeHtml(menu.title)}</strong>
+          <small>${escapeHtml(menu.date || currentProject.date)}</small>
+        </button>
+      `).join("")}
+    </div>
+  ` : `<div class="empty-projects">Aucun menu. Appuie sur Créer les jours pour faire un calendrier.</div>`;
+  const selectedMenu = currentMenuIndex !== null ? menus[currentMenuIndex] : null;
+  menuList.innerHTML = `${calendar}${selectedMenu ? renderMenuEditor(selectedMenu, currentMenuIndex) : ""}`;
 
   menuList.querySelectorAll("[data-open-menu]").forEach((button) => {
     button.addEventListener("click", () => {
       const index = Number(button.dataset.openMenu);
-      currentMenuIndex = currentMenuIndex === index ? null : index;
+      currentMenuIndex = index;
+      renderMenus();
+    });
+  });
+  menuList.querySelectorAll("[data-close-menu]").forEach((button) => {
+    button.addEventListener("click", () => {
+      currentMenuIndex = null;
       renderMenus();
     });
   });
@@ -1115,46 +1180,42 @@ function deleteMenu(menuIndex) {
 function printMenu(menuIndex) {
   const menu = ensureMenus(currentProject)[menuIndex];
   if (!menu) return;
-  const printRows = menu.sections.map((section) => `
-    <section>
-      <h2>${escapeHtml(section.title)} <span>${escapeHtml(serviceModeLabel(section.serviceMode))}</span></h2>
-      <div class="content">${escapeHtml(section.content || "À compléter")}</div>
-    </section>
-  `).join("");
   const html = `
     <html>
       <head>
         <meta charset="utf-8" />
         <title>${escapeHtml(menu.title)} - fiche chef</title>
         <style>
-          @page { size: A4; margin: 10mm; }
-          body { font-family: Arial, sans-serif; color: #1f2a2e; margin: 0; }
-          header { border-bottom: 3px solid #1f2a2e; padding-bottom: 10px; margin-bottom: 10px; }
-          h1 { margin: 0 0 6px; font-size: 25px; }
-          .meta { color: #606866; font-size: 13px; }
-          main { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-          section { break-inside: avoid; border: 1px solid #d8dedb; border-radius: 10px; padding: 9px; min-height: 86px; }
-          h2 { margin: 0 0 6px; font-size: 15px; }
-          h2 span { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 999px; background: #eef4f0; color: #315747; font-size: 12px; vertical-align: middle; }
-          .content { white-space: pre-line; line-height: 1.32; font-size: 13px; }
-          .notes { grid-column: 1 / -1; min-height: 72px; background: #f4f7f1; }
-          button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 10px; background: #1f2a2e; color: white; font-weight: bold; }
-          @media print { button { display: none; } }
+          ${menuPrintStyles()}
         </style>
       </head>
       <body>
-        <button onclick="window.print()">Imprimer</button>
-        <header>
-          <h1>${escapeHtml(menu.title)}</h1>
-          <div class="meta">${escapeHtml(currentProject.name)} · ${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes · Service : ${escapeHtml(serviceModeLabel(menu.serviceMode))}</div>
-        </header>
-        <main>
-          ${printRows}
-          <section class="notes">
-            <h2>Notes importantes</h2>
-            <div class="content">${escapeHtml(menu.notes || "Aucune note")}</div>
-          </section>
-        </main>
+        ${menuPrintHtml(menu)}
+      </body>
+    </html>
+  `;
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+}
+
+function printAllMenus() {
+  const menus = ensureMenus(currentProject);
+  if (!menus.length) return;
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(currentProject.name)} - menus chef</title>
+        <style>
+          ${menuPrintStyles()}
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print()">Tout imprimer</button>
+        ${menus.map((menu) => menuPrintHtml(menu, false)).join("")}
       </body>
     </html>
   `;
@@ -2032,6 +2093,7 @@ document.querySelector("#quickForm").addEventListener("submit", (event) => {
 document.querySelector("#addNoteBtn").addEventListener("click", addNote);
 document.querySelector("#addMenuBtn").addEventListener("click", addMenu);
 document.querySelector("#buildMenuDaysBtn").addEventListener("click", buildMenuDays);
+document.querySelector("#printAllMenusBtn").addEventListener("click", printAllMenus);
 
 async function initApp() {
   await loadProjectsFromCloud();
