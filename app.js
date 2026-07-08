@@ -867,6 +867,10 @@ function ensureMenus(project) {
     });
     menu.sections.forEach((section) => {
       if (!section.serviceMode) section.serviceMode = "selon-menu";
+      if (!Array.isArray(section.costItems)) section.costItems = [];
+      if (section.countStaff === undefined) {
+        section.countStaff = /petit déjeuner|dejeuner|déjeuner|diner|dîner|plat|buffet/i.test(section.title);
+      }
     });
   });
   return project.menus;
@@ -902,7 +906,13 @@ function defaultMenuSections(type) {
   const titles = type === "Réception"
     ? ["Cocktail / apéritif", "Buffet / entrée", "Plat principal", "Dessert", "Boissons", "Notes service"]
     : ["Petit déjeuner", "Déjeuner", "Dîner", "Enfants", "Boissons", "Notes chef"];
-  return titles.map((title) => ({ title, content: "", serviceMode: title.toLowerCase().includes("buffet") ? "buffet" : "selon-menu" }));
+  return titles.map((title) => ({
+    title,
+    content: "",
+    serviceMode: title.toLowerCase().includes("buffet") ? "buffet" : "selon-menu",
+    countStaff: /petit déjeuner|dejeuner|déjeuner|diner|dîner|plat|buffet/i.test(title),
+    costItems: []
+  }));
 }
 
 function makeMenuDay(title, date = "", type = currentProject.type) {
@@ -911,9 +921,43 @@ function makeMenuDay(title, date = "", type = currentProject.type) {
     title,
     date,
     people: currentProject.people || 0,
+    staffCost: 0,
     serviceMode: "mixte",
     notes: "",
     sections: defaultMenuSections(type)
+  };
+}
+
+function costItemTotal(item) {
+  return Number(item.quantity || 0) * Number(item.unitPrice || 0);
+}
+
+function sectionMerchandiseTotal(section) {
+  return (section.costItems || []).reduce((sum, item) => sum + costItemTotal(item), 0);
+}
+
+function countedStaffSections(menu) {
+  return (menu.sections || []).filter((section) => section.countStaff);
+}
+
+function sectionStaffShare(menu, section) {
+  if (!section.countStaff) return 0;
+  const count = countedStaffSections(menu).length;
+  return count ? Number(menu.staffCost || 0) / count : 0;
+}
+
+function menuCostTotals(menu) {
+  const merchandise = (menu.sections || []).reduce((sum, section) => sum + sectionMerchandiseTotal(section), 0);
+  const staff = Number(menu.staffCost || 0);
+  const global = merchandise + staff;
+  const people = Number(menu.people || currentProject.people || 0);
+  return {
+    merchandise,
+    staff,
+    global,
+    people,
+    merchandisePerPerson: people ? merchandise / people : 0,
+    globalPerPerson: people ? global / people : 0
   };
 }
 
@@ -963,6 +1007,7 @@ function menuPrintStyles() {
 }
 
 function renderMenuEditor(menu, menuIndex) {
+  const totals = menuCostTotals(menu);
   return `
     <article class="menu-card is-open" data-menu-index="${menuIndex}">
       <header>
@@ -997,6 +1042,27 @@ function renderMenuEditor(menu, menuIndex) {
               ${serviceModeOptions(menu.serviceMode || "mixte")}
             </select>
           </label>
+          <label>
+            Personnel du jour
+            <input type="number" min="0" step="0.01" inputmode="decimal" value="${Number(menu.staffCost || 0)}" data-menu-field="staffCost" />
+          </label>
+        </div>
+        <div class="menu-cost-summary">
+          <div>
+            <span>Marchandises</span>
+            <strong>${money.format(totals.merchandise)}</strong>
+            <em>${money.format(totals.merchandisePerPerson)} / pers.</em>
+          </div>
+          <div>
+            <span>Personnel</span>
+            <strong>${money.format(totals.staff)}</strong>
+            <em>${countedStaffSections(menu).length || 0} repas comptés</em>
+          </div>
+          <div>
+            <span>Global jour</span>
+            <strong>${money.format(totals.global)}</strong>
+            <em>${money.format(totals.globalPerPerson)} / pers.</em>
+          </div>
         </div>
         <div class="menu-sections">
           ${menu.sections.map((section, sectionIndex) => `
@@ -1014,6 +1080,30 @@ function renderMenuEditor(menu, menuIndex) {
                 </select>
               </label>
               <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
+              <label class="menu-staff-toggle">
+                <input type="checkbox" data-menu-section-field="countStaff" ${section.countStaff ? "checked" : ""} />
+                <span>Compter ce bloc pour répartir le personnel</span>
+              </label>
+              <div class="section-cost-summary">
+                <span>Marchandises : <strong>${money.format(sectionMerchandiseTotal(section))}</strong></span>
+                <span>Personnel : <strong>${money.format(sectionStaffShare(menu, section))}</strong></span>
+                <span>Total : <strong>${money.format(sectionMerchandiseTotal(section) + sectionStaffShare(menu, section))}</strong></span>
+              </div>
+              <div class="cost-items">
+                ${(section.costItems || []).map((item, itemIndex) => `
+                  <div class="cost-item-row" data-cost-index="${itemIndex}">
+                    <input value="${escapeHtml(item.name || "")}" placeholder="Produit" data-cost-field="name" />
+                    <input type="number" min="0" step="0.01" inputmode="decimal" value="${Number(item.quantity || 0)}" placeholder="Qté" data-cost-field="quantity" />
+                    <input value="${escapeHtml(item.unit || "")}" placeholder="Unité" data-cost-field="unit" />
+                    <input type="number" min="0" step="0.01" inputmode="decimal" value="${Number(item.unitPrice || 0)}" placeholder="Prix" data-cost-field="unitPrice" />
+                    <strong>${money.format(costItemTotal(item))}</strong>
+                    <button type="button" class="icon-button ghost" data-delete-cost-item="${itemIndex}" aria-label="Supprimer ce produit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                    </button>
+                  </div>
+                `).join("")}
+              </div>
+              <button type="button" class="text-button cost-add-button" data-add-cost-item="${sectionIndex}">+ Ajouter un coût</button>
             </div>
           `).join("")}
         </div>
@@ -1072,10 +1162,34 @@ function renderMenus() {
     const saveField = () => {
       const card = field.closest("[data-menu-index]");
       const section = field.closest("[data-section-index]");
-      updateMenuSection(Number(card.dataset.menuIndex), Number(section.dataset.sectionIndex), field.dataset.menuSectionField, field.value);
+      const value = field.type === "checkbox" ? field.checked : field.value;
+      updateMenuSection(Number(card.dataset.menuIndex), Number(section.dataset.sectionIndex), field.dataset.menuSectionField, value);
     };
     field.addEventListener("input", saveField);
     field.addEventListener("change", saveField);
+  });
+  menuList.querySelectorAll("[data-cost-field]").forEach((field) => {
+    const saveField = () => {
+      const card = field.closest("[data-menu-index]");
+      const section = field.closest("[data-section-index]");
+      const costRow = field.closest("[data-cost-index]");
+      updateCostItem(Number(card.dataset.menuIndex), Number(section.dataset.sectionIndex), Number(costRow.dataset.costIndex), field.dataset.costField, field.value);
+    };
+    field.addEventListener("input", saveField);
+    field.addEventListener("change", saveField);
+  });
+  menuList.querySelectorAll("[data-add-cost-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const card = button.closest("[data-menu-index]");
+      addCostItem(Number(card.dataset.menuIndex), Number(button.dataset.addCostItem));
+    });
+  });
+  menuList.querySelectorAll("[data-delete-cost-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const card = button.closest("[data-menu-index]");
+      const section = button.closest("[data-section-index]");
+      deleteCostItem(Number(card.dataset.menuIndex), Number(section.dataset.sectionIndex), Number(button.dataset.deleteCostItem));
+    });
   });
   menuList.querySelectorAll("[data-add-menu-section]").forEach((button) => {
     button.addEventListener("click", () => addMenuSection(Number(button.dataset.addMenuSection)));
@@ -1139,7 +1253,7 @@ function buildMenuDays() {
 function updateMenuField(menuIndex, field, value) {
   const menu = ensureMenus(currentProject)[menuIndex];
   if (!menu) return;
-  menu[field] = field === "people" ? Number(value || 0) : value;
+  menu[field] = field === "people" || field === "staffCost" ? Number(value || 0) : value;
   scheduleCloudSave();
 }
 
@@ -1150,12 +1264,39 @@ function updateMenuSection(menuIndex, sectionIndex, field, value) {
   scheduleCloudSave();
 }
 
+function updateCostItem(menuIndex, sectionIndex, itemIndex, field, value) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  const item = menu?.sections?.[sectionIndex]?.costItems?.[itemIndex];
+  if (!item) return;
+  item[field] = field === "quantity" || field === "unitPrice" ? Number(value || 0) : value;
+  scheduleCloudSave();
+}
+
+function addCostItem(menuIndex, sectionIndex) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  const section = menu?.sections?.[sectionIndex];
+  if (!section) return;
+  if (!Array.isArray(section.costItems)) section.costItems = [];
+  section.costItems.push({ name: "", quantity: 1, unit: "", unitPrice: 0 });
+  renderMenus();
+  scheduleCloudSave();
+}
+
+function deleteCostItem(menuIndex, sectionIndex, itemIndex) {
+  const menu = ensureMenus(currentProject)[menuIndex];
+  const section = menu?.sections?.[sectionIndex];
+  if (!section?.costItems?.[itemIndex]) return;
+  section.costItems.splice(itemIndex, 1);
+  renderMenus();
+  scheduleCloudSave();
+}
+
 function addMenuSection(menuIndex) {
   const title = window.prompt("Nom de la partie", "À préparer");
   if (!title?.trim()) return;
   const menu = ensureMenus(currentProject)[menuIndex];
   if (!menu) return;
-  menu.sections.push({ title: title.trim(), content: "", serviceMode: "selon-menu" });
+  menu.sections.push({ title: title.trim(), content: "", serviceMode: "selon-menu", countStaff: true, costItems: [] });
   renderMenus();
   scheduleCloudSave();
 }

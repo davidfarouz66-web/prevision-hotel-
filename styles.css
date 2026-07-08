@@ -995,6 +995,102 @@ svg {
   font-weight: 850;
 }
 
+.menu-cost-summary,
+.section-cost-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-cost-summary {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.menu-cost-summary div,
+.section-cost-summary {
+  padding: 10px;
+  border: 1px solid rgba(31, 42, 46, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 250, 243, 0.86);
+}
+
+.menu-cost-summary span,
+.section-cost-summary span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.menu-cost-summary strong,
+.section-cost-summary strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.menu-cost-summary em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.section-cost-summary {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.menu-staff-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #315747;
+}
+
+.menu-staff-toggle input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--green);
+}
+
+.cost-items {
+  display: grid;
+  gap: 8px;
+}
+
+.cost-item-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 34px;
+  gap: 6px;
+  align-items: center;
+}
+
+.cost-item-row input:first-child {
+  grid-column: 1 / -1;
+}
+
+.cost-item-row strong {
+  grid-column: 1 / 4;
+}
+
+.cost-item-row input {
+  min-height: 38px;
+  border-radius: 11px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.cost-item-row strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cost-add-button {
+  justify-self: start;
+}
+
 .menu-section textarea,
 .menu-card textarea {
   width: 100%;
