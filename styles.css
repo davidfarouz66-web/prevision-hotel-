@@ -278,6 +278,14 @@ svg {
   margin-top: 22px;
 }
 
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .text-button {
   background: transparent;
   color: var(--blue);

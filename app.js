@@ -414,6 +414,26 @@ function displayDate(value) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+function displayShortDay(value) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short"
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function datesBetween(startValue, endValue) {
+  if (!startValue || !endValue || endValue < startValue) return [];
+  const dates = [];
+  let cursor = new Date(`${startValue}T12:00:00`);
+  const end = new Date(`${endValue}T12:00:00`);
+  while (cursor <= end && dates.length < 45) {
+    dates.push(isoDate(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return dates;
+}
+
 function parseDisplayDate(value) {
   if (!value || value === "À fixer") return isoDate(new Date());
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -879,6 +899,18 @@ function defaultMenuSections(type) {
   return titles.map((title) => ({ title, content: "", serviceMode: title.toLowerCase().includes("buffet") ? "buffet" : "selon-menu" }));
 }
 
+function makeMenuDay(title, date = "", type = currentProject.type) {
+  return {
+    id: makeProjectId(title),
+    title,
+    date,
+    people: currentProject.people || 0,
+    serviceMode: "mixte",
+    notes: "",
+    sections: defaultMenuSections(type)
+  };
+}
+
 function renderMenus() {
   const menus = ensureMenus(currentProject);
   menuList.innerHTML = menus.length ? menus.map((menu, menuIndex) => `
@@ -973,15 +1005,37 @@ function addMenu() {
   if (!title?.trim()) return;
   const date = window.prompt("Date ou service", currentProject.date || "");
   const menus = ensureMenus(currentProject);
-  menus.unshift({
-    id: makeProjectId(title),
-    title: title.trim(),
-    date: date?.trim() || currentProject.date || "",
-    people: currentProject.people || 0,
-    serviceMode: "mixte",
-    notes: "",
-    sections: defaultMenuSections(currentProject.type)
-  });
+  menus.unshift(makeMenuDay(title.trim(), date?.trim() || currentProject.date || ""));
+  renderMenus();
+  scheduleCloudSave();
+}
+
+function buildMenuDays() {
+  const defaultStart = currentProject.menuStartDate || parseDisplayDate(currentProject.date);
+  const start = window.prompt("Date de début du séjour (AAAA-MM-JJ)", defaultStart);
+  if (!start) return;
+  const end = window.prompt("Date de fin du séjour (AAAA-MM-JJ)", currentProject.menuEndDate || start);
+  if (!end) return;
+  const days = datesBetween(start, end);
+  if (!days.length) {
+    window.alert("Les dates ne sont pas bonnes. Exemple : 2026-07-09");
+    return;
+  }
+  const menus = ensureMenus(currentProject);
+  const existingDates = new Set(menus.map((menu) => menu.isoDate).filter(Boolean));
+  const newMenus = days
+    .filter((date) => !existingDates.has(date))
+    .map((date) => ({
+      ...makeMenuDay(displayShortDay(date), displayDate(date)),
+      isoDate: date
+    }));
+  if (!newMenus.length) {
+    window.alert("Les jours existent déjà dans les menus.");
+    return;
+  }
+  currentProject.menuStartDate = start;
+  currentProject.menuEndDate = end;
+  currentProject.menus = [...newMenus, ...menus].sort((a, b) => String(a.isoDate || "").localeCompare(String(b.isoDate || "")));
   renderMenus();
   scheduleCloudSave();
 }
@@ -1046,17 +1100,19 @@ function printMenu(menuIndex) {
         <meta charset="utf-8" />
         <title>${escapeHtml(menu.title)} - fiche chef</title>
         <style>
-          body { font-family: Arial, sans-serif; color: #1f2a2e; margin: 32px; }
-          header { border-bottom: 3px solid #1f2a2e; padding-bottom: 16px; margin-bottom: 20px; }
-          h1 { margin: 0 0 8px; font-size: 30px; }
-          .meta { color: #606866; font-size: 15px; }
-          section { break-inside: avoid; border: 1px solid #d8dedb; border-radius: 12px; padding: 14px; margin: 12px 0; }
-          h2 { margin: 0 0 10px; font-size: 18px; }
+          @page { size: A4; margin: 10mm; }
+          body { font-family: Arial, sans-serif; color: #1f2a2e; margin: 0; }
+          header { border-bottom: 3px solid #1f2a2e; padding-bottom: 10px; margin-bottom: 10px; }
+          h1 { margin: 0 0 6px; font-size: 25px; }
+          .meta { color: #606866; font-size: 13px; }
+          main { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          section { break-inside: avoid; border: 1px solid #d8dedb; border-radius: 10px; padding: 9px; min-height: 86px; }
+          h2 { margin: 0 0 6px; font-size: 15px; }
           h2 span { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 999px; background: #eef4f0; color: #315747; font-size: 12px; vertical-align: middle; }
-          .content { white-space: pre-line; line-height: 1.45; font-size: 15px; }
-          .notes { background: #f4f7f1; }
+          .content { white-space: pre-line; line-height: 1.32; font-size: 13px; }
+          .notes { grid-column: 1 / -1; min-height: 72px; background: #f4f7f1; }
           button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 10px; background: #1f2a2e; color: white; font-weight: bold; }
-          @media print { button { display: none; } body { margin: 18px; } }
+          @media print { button { display: none; } }
         </style>
       </head>
       <body>
@@ -1065,11 +1121,13 @@ function printMenu(menuIndex) {
           <h1>${escapeHtml(menu.title)}</h1>
           <div class="meta">${escapeHtml(currentProject.name)} · ${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes · Service : ${escapeHtml(serviceModeLabel(menu.serviceMode))}</div>
         </header>
-        ${printRows}
-        <section class="notes">
-          <h2>Notes importantes</h2>
-          <div class="content">${escapeHtml(menu.notes || "Aucune note")}</div>
-        </section>
+        <main>
+          ${printRows}
+          <section class="notes">
+            <h2>Notes importantes</h2>
+            <div class="content">${escapeHtml(menu.notes || "Aucune note")}</div>
+          </section>
+        </main>
       </body>
     </html>
   `;
@@ -1274,6 +1332,21 @@ function showTab(tabName) {
   document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("is-active"));
   document.querySelector(`[data-tab="${tabName}"]`)?.classList.add("is-selected");
   document.querySelector(`#${tabName}Panel`)?.classList.add("is-active");
+}
+
+function activeTabName() {
+  return document.querySelector(".tab.is-selected")?.dataset.tab || "resume";
+}
+
+function handleFloatingAdd() {
+  const tab = activeTabName();
+  if (tab === "menus") {
+    addMenu();
+  } else if (tab === "notes") {
+    addNote();
+  } else {
+    openSheet();
+  }
 }
 
 function openSheet(mode = "budget") {
@@ -1636,7 +1709,7 @@ projectMenuBtn.addEventListener("click", (event) => {
 projectMenu.querySelectorAll("[data-menu-action]").forEach((button) => {
   button.addEventListener("click", () => handleProjectMenuAction(button.dataset.menuAction));
 });
-document.querySelector("#floatingAdd").addEventListener("click", () => openSheet());
+document.querySelector("#floatingAdd").addEventListener("click", handleFloatingAdd);
 document.querySelector("#addForgottenBtn").addEventListener("click", () => openSheet());
 document.querySelectorAll(".addLineBtn").forEach((button) => button.addEventListener("click", () => openSheet()));
 document.querySelector("#newProjectBtn").addEventListener("click", openProjectSheet);
@@ -1931,6 +2004,7 @@ document.querySelector("#quickForm").addEventListener("submit", (event) => {
 
 document.querySelector("#addNoteBtn").addEventListener("click", addNote);
 document.querySelector("#addMenuBtn").addEventListener("click", addMenu);
+document.querySelector("#buildMenuDaysBtn").addEventListener("click", buildMenuDays);
 
 async function initApp() {
   await loadProjectsFromCloud();
