@@ -135,6 +135,7 @@ let currentProject = projects[0];
 let currentBudgetIndex = null;
 let currentDetailIndex = null;
 let currentScheduleIndex = null;
+let currentMenuIndex = null;
 let formMode = "budget";
 let projectFormMode = "create";
 const demoProjectNames = ["marrakech pessah", "reception cohen", "week-end deauville"];
@@ -913,75 +914,98 @@ function makeMenuDay(title, date = "", type = currentProject.type) {
 
 function renderMenus() {
   const menus = ensureMenus(currentProject);
+  if (currentMenuIndex !== null && !menus[currentMenuIndex]) currentMenuIndex = null;
   menuList.innerHTML = menus.length ? menus.map((menu, menuIndex) => `
-    <article class="menu-card" data-menu-index="${menuIndex}">
+    <article class="menu-card ${currentMenuIndex === menuIndex ? "is-open" : "is-compact"}" data-menu-index="${menuIndex}">
       <header>
-        <div>
+        <button class="menu-summary" type="button" data-open-menu="${menuIndex}">
           <span class="type-pill">Fiche chef</span>
-          <input class="menu-title-input" value="${escapeHtml(menu.title)}" data-menu-field="title" aria-label="Titre du menu" />
-        </div>
-        <button class="icon-button ghost" type="button" data-print-menu="${menuIndex}" aria-label="Imprimer ce menu">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+          <strong>${escapeHtml(menu.title)}</strong>
+          <small>${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes · ${escapeHtml(serviceModeLabel(menu.serviceMode))}</small>
         </button>
+        <div class="menu-header-actions">
+          <button class="icon-button ghost" type="button" data-print-menu="${menuIndex}" aria-label="Imprimer ce menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+          </button>
+          <button class="icon-button ghost menu-toggle-button" type="button" data-open-menu="${menuIndex}" aria-label="Ouvrir ce menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="${currentMenuIndex === menuIndex ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6"}"/></svg>
+          </button>
+        </div>
       </header>
-      <div class="menu-meta-grid">
-        <label>
-          Date / service
-          <input value="${escapeHtml(menu.date || "")}" data-menu-field="date" placeholder="Vendredi soir" />
-        </label>
-        <label>
-          Personnes
-          <input type="number" min="0" step="1" value="${Number(menu.people || 0)}" data-menu-field="people" />
-        </label>
-        <label>
-          Service du repas
-          <select data-menu-field="serviceMode">
-            ${serviceModeOptions(menu.serviceMode || "mixte")}
-          </select>
-        </label>
-      </div>
-      <div class="menu-sections">
-        ${menu.sections.map((section, sectionIndex) => `
-          <div class="menu-section" data-section-index="${sectionIndex}">
-            <div class="menu-section-title-row">
-              <input value="${escapeHtml(section.title)}" data-menu-section-field="title" aria-label="Titre de la partie" />
-              <button type="button" class="icon-button ghost" data-delete-menu-section="${sectionIndex}" aria-label="Supprimer cette partie">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
-              </button>
-            </div>
-            <label class="menu-service-select">
-              Service de cette partie
-              <select data-menu-section-field="serviceMode">
-                ${serviceModeOptions(section.serviceMode || "selon-menu")}
+      ${currentMenuIndex === menuIndex ? `
+        <div class="menu-editor">
+          <input class="menu-title-input" value="${escapeHtml(menu.title)}" data-menu-field="title" aria-label="Titre du menu" />
+          <div class="menu-meta-grid">
+            <label>
+              Date / service
+              <input value="${escapeHtml(menu.date || "")}" data-menu-field="date" placeholder="Vendredi soir" />
+            </label>
+            <label>
+              Personnes
+              <input type="number" min="0" step="1" value="${Number(menu.people || 0)}" data-menu-field="people" />
+            </label>
+            <label>
+              Service du repas
+              <select data-menu-field="serviceMode">
+                ${serviceModeOptions(menu.serviceMode || "mixte")}
               </select>
             </label>
-            <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
           </div>
-        `).join("")}
-      </div>
-      <label>
-        Notes importantes pour le chef
-        <textarea data-menu-field="notes" rows="3" placeholder="Allergies, horaires, dressage, enfants, remarques...">${escapeHtml(menu.notes || "")}</textarea>
-      </label>
-      <footer class="menu-card-actions">
-        <button type="button" class="secondary-button" data-add-menu-section="${menuIndex}">Ajouter une partie</button>
-        <button type="button" class="delete-button inline-delete" data-delete-menu="${menuIndex}">Supprimer</button>
-      </footer>
+          <div class="menu-sections">
+            ${menu.sections.map((section, sectionIndex) => `
+              <div class="menu-section" data-section-index="${sectionIndex}">
+                <div class="menu-section-title-row">
+                  <input value="${escapeHtml(section.title)}" data-menu-section-field="title" aria-label="Titre de la partie" />
+                  <button type="button" class="icon-button ghost" data-delete-menu-section="${sectionIndex}" aria-label="Supprimer cette partie">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                  </button>
+                </div>
+                <label class="menu-service-select">
+                  Service de cette partie
+                  <select data-menu-section-field="serviceMode">
+                    ${serviceModeOptions(section.serviceMode || "selon-menu")}
+                  </select>
+                </label>
+                <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
+              </div>
+            `).join("")}
+          </div>
+          <label>
+            Notes importantes pour le chef
+            <textarea data-menu-field="notes" rows="3" placeholder="Allergies, horaires, dressage, enfants, remarques...">${escapeHtml(menu.notes || "")}</textarea>
+          </label>
+          <footer class="menu-card-actions">
+            <button type="button" class="secondary-button" data-add-menu-section="${menuIndex}">Ajouter une partie</button>
+            <button type="button" class="delete-button inline-delete" data-delete-menu="${menuIndex}">Supprimer</button>
+          </footer>
+        </div>
+      ` : ""}
     </article>
   `).join("") : `<div class="empty-projects">Aucun menu. Appuie sur Ajouter pour créer une fiche chef.</div>`;
 
-  menuList.querySelectorAll("[data-menu-field]").forEach((field) => {
-    field.addEventListener("input", () => {
-      const card = field.closest("[data-menu-index]");
-      updateMenuField(Number(card.dataset.menuIndex), field.dataset.menuField, field.value);
+  menuList.querySelectorAll("[data-open-menu]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.openMenu);
+      currentMenuIndex = currentMenuIndex === index ? null : index;
+      renderMenus();
     });
   });
+  menuList.querySelectorAll("[data-menu-field]").forEach((field) => {
+    const saveField = () => {
+      const card = field.closest("[data-menu-index]");
+      updateMenuField(Number(card.dataset.menuIndex), field.dataset.menuField, field.value);
+    };
+    field.addEventListener("input", saveField);
+    field.addEventListener("change", saveField);
+  });
   menuList.querySelectorAll("[data-menu-section-field]").forEach((field) => {
-    field.addEventListener("input", () => {
+    const saveField = () => {
       const card = field.closest("[data-menu-index]");
       const section = field.closest("[data-section-index]");
       updateMenuSection(Number(card.dataset.menuIndex), Number(section.dataset.sectionIndex), field.dataset.menuSectionField, field.value);
-    });
+    };
+    field.addEventListener("input", saveField);
+    field.addEventListener("change", saveField);
   });
   menuList.querySelectorAll("[data-add-menu-section]").forEach((button) => {
     button.addEventListener("click", () => addMenuSection(Number(button.dataset.addMenuSection)));
@@ -1006,6 +1030,7 @@ function addMenu() {
   const date = window.prompt("Date ou service", currentProject.date || "");
   const menus = ensureMenus(currentProject);
   menus.unshift(makeMenuDay(title.trim(), date?.trim() || currentProject.date || ""));
+  currentMenuIndex = 0;
   renderMenus();
   scheduleCloudSave();
 }
@@ -1036,6 +1061,7 @@ function buildMenuDays() {
   currentProject.menuStartDate = start;
   currentProject.menuEndDate = end;
   currentProject.menus = [...newMenus, ...menus].sort((a, b) => String(a.isoDate || "").localeCompare(String(b.isoDate || "")));
+  currentMenuIndex = 0;
   renderMenus();
   scheduleCloudSave();
 }
@@ -1081,6 +1107,7 @@ function deleteMenu(menuIndex) {
   const confirmed = window.confirm(`Supprimer le menu "${menu.title}" ?`);
   if (!confirmed) return;
   menus.splice(menuIndex, 1);
+  currentMenuIndex = null;
   renderMenus();
   scheduleCloudSave();
 }

@@ -835,12 +835,17 @@ svg {
 
 .menu-card {
   display: grid;
-  gap: 14px;
-  padding: 15px;
+  gap: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 17px;
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 12px 30px rgba(53, 48, 38, 0.08);
+}
+
+.menu-card.is-open {
+  padding: 15px;
+  border-radius: 20px;
 }
 
 .menu-card header,
@@ -855,10 +860,43 @@ svg {
   justify-content: space-between;
 }
 
-.menu-card header > div {
+.menu-summary {
   display: grid;
   flex: 1;
-  gap: 8px;
+  gap: 5px;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.menu-summary strong,
+.menu-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-summary strong {
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.menu-summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.menu-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.menu-editor {
+  display: grid;
+  gap: 14px;
 }
 
 .menu-title-input,
