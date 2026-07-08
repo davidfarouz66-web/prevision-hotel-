@@ -837,16 +837,46 @@ function addNote() {
 function ensureMenus(project) {
   if (!Array.isArray(project.menus)) project.menus = [];
   project.menus.forEach((menu) => {
+    if (!menu.serviceMode) menu.serviceMode = "mixte";
     if (!Array.isArray(menu.sections)) menu.sections = defaultMenuSections(project.type);
+    menu.sections.forEach((section) => {
+      if (!section.serviceMode) section.serviceMode = "selon-menu";
+    });
   });
   return project.menus;
+}
+
+function serviceModeOptions(selectedValue = "selon-menu") {
+  const options = [
+    ["selon-menu", "Selon le menu"],
+    ["buffet", "Buffet"],
+    ["assiette", "À l'assiette"],
+    ["mixte", "Mixte"],
+    ["a-table", "À table"],
+    ["a-emporter", "À emporter"]
+  ];
+  return options.map(([value, label]) => (
+    `<option value="${value}" ${value === selectedValue ? "selected" : ""}>${label}</option>`
+  )).join("");
+}
+
+function serviceModeLabel(value) {
+  const labels = {
+    "selon-menu": "Selon le menu",
+    buffet: "Buffet",
+    assiette: "À l'assiette",
+    mixte: "Mixte",
+    "a-table": "À table",
+    "a-emporter": "À emporter"
+  };
+  return labels[value] || labels["selon-menu"];
 }
 
 function defaultMenuSections(type) {
   const titles = type === "Réception"
     ? ["Cocktail / apéritif", "Buffet / entrée", "Plat principal", "Dessert", "Boissons", "Notes service"]
     : ["Petit déjeuner", "Déjeuner", "Kiddouch / buffet", "Dîner", "Enfants", "Notes chef"];
-  return titles.map((title) => ({ title, content: "" }));
+  return titles.map((title) => ({ title, content: "", serviceMode: title.toLowerCase().includes("buffet") ? "buffet" : "selon-menu" }));
 }
 
 function renderMenus() {
@@ -871,6 +901,12 @@ function renderMenus() {
           Personnes
           <input type="number" min="0" step="1" value="${Number(menu.people || 0)}" data-menu-field="people" />
         </label>
+        <label>
+          Service du repas
+          <select data-menu-field="serviceMode">
+            ${serviceModeOptions(menu.serviceMode || "mixte")}
+          </select>
+        </label>
       </div>
       <div class="menu-sections">
         ${menu.sections.map((section, sectionIndex) => `
@@ -881,6 +917,12 @@ function renderMenus() {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
               </button>
             </div>
+            <label class="menu-service-select">
+              Service de cette partie
+              <select data-menu-section-field="serviceMode">
+                ${serviceModeOptions(section.serviceMode || "selon-menu")}
+              </select>
+            </label>
             <textarea data-menu-section-field="content" rows="3" placeholder="Écris ici ce que le chef doit préparer...">${escapeHtml(section.content || "")}</textarea>
           </div>
         `).join("")}
@@ -936,6 +978,7 @@ function addMenu() {
     title: title.trim(),
     date: date?.trim() || currentProject.date || "",
     people: currentProject.people || 0,
+    serviceMode: "mixte",
     notes: "",
     sections: defaultMenuSections(currentProject.type)
   });
@@ -962,7 +1005,7 @@ function addMenuSection(menuIndex) {
   if (!title?.trim()) return;
   const menu = ensureMenus(currentProject)[menuIndex];
   if (!menu) return;
-  menu.sections.push({ title: title.trim(), content: "" });
+  menu.sections.push({ title: title.trim(), content: "", serviceMode: "selon-menu" });
   renderMenus();
   scheduleCloudSave();
 }
@@ -993,7 +1036,7 @@ function printMenu(menuIndex) {
   if (!menu) return;
   const printRows = menu.sections.map((section) => `
     <section>
-      <h2>${escapeHtml(section.title)}</h2>
+      <h2>${escapeHtml(section.title)} <span>${escapeHtml(serviceModeLabel(section.serviceMode))}</span></h2>
       <div class="content">${escapeHtml(section.content || "À compléter")}</div>
     </section>
   `).join("");
@@ -1009,6 +1052,7 @@ function printMenu(menuIndex) {
           .meta { color: #606866; font-size: 15px; }
           section { break-inside: avoid; border: 1px solid #d8dedb; border-radius: 12px; padding: 14px; margin: 12px 0; }
           h2 { margin: 0 0 10px; font-size: 18px; }
+          h2 span { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 999px; background: #eef4f0; color: #315747; font-size: 12px; vertical-align: middle; }
           .content { white-space: pre-line; line-height: 1.45; font-size: 15px; }
           .notes { background: #f4f7f1; }
           button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 10px; background: #1f2a2e; color: white; font-weight: bold; }
@@ -1019,7 +1063,7 @@ function printMenu(menuIndex) {
         <button onclick="window.print()">Imprimer</button>
         <header>
           <h1>${escapeHtml(menu.title)}</h1>
-          <div class="meta">${escapeHtml(currentProject.name)} · ${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes</div>
+          <div class="meta">${escapeHtml(currentProject.name)} · ${escapeHtml(menu.date || currentProject.date)} · ${Number(menu.people || currentProject.people || 0)} personnes · Service : ${escapeHtml(serviceModeLabel(menu.serviceMode))}</div>
         </header>
         ${printRows}
         <section class="notes">
